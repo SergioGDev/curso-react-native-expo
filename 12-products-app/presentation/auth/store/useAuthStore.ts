@@ -1,5 +1,10 @@
-import { authCheckStatus, authLogin } from "@/core/auth/actions/auth-actions";
+import {
+  authCheckStatus,
+  authLogin,
+  register,
+} from "@/core/auth/actions/auth-actions";
 import { User } from "@/core/auth/interfaces/user";
+import { SecureStorageAdapter } from "@/helpers/adapters/secure-storage.adapter";
 import { create } from "zustand";
 
 export type AuthStatus = "authenticated" | "unauthenticated" | "checking";
@@ -12,7 +17,12 @@ export interface AuthState {
   login: (email: string, password: string) => Promise<boolean>;
   checkStatus: () => Promise<void>;
   logout: () => Promise<void>;
-  changeStatus(token?: string, user?: User): boolean;
+  changeStatus(token?: string, user?: User): Promise<boolean>;
+  register: (
+    email: string,
+    password: string,
+    fullName: string
+  ) => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState>()((set, get) => ({
@@ -20,31 +30,36 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   token: undefined,
   user: undefined,
 
+  changeStatus: async (token?: string, user?: User) => {
+    if (!token || !user) {
+      set({ status: "unauthenticated", token: undefined, user: undefined });
+      await SecureStorageAdapter.deleteItem("token");
+      return false;
+    }
+
+    set({ status: "authenticated", token, user });
+    await SecureStorageAdapter.setItem("token", token);
+
+    return true;
+  },
+
   login: async (email: string, password: string) => {
     const resp = await authLogin(email, password);
     return get().changeStatus(resp?.token, resp?.user);
   },
 
-  changeStatus: (token?: string, user?: User) => {
-    if (!token || !user) {
-      set({ status: "unauthenticated", token: undefined, user: undefined });
-      // TODO: Llamar logout
-      return false;
-    }
-
-    set({ status: "authenticated", token, user });
-    return true;
-  },
-
   checkStatus: async () => {
     const resp = await authCheckStatus();
     get().changeStatus(resp?.token, resp?.user);
-
-    // TODO: Guardar el token en el storage
   },
   logout: async () => {
-    // TODO: LIMPIAR el token en el storage
+    SecureStorageAdapter.deleteItem("token");
     set({ status: "unauthenticated", token: undefined, user: undefined });
     // Simulate logout
+  },
+
+  register: async (email, password, fullName) => {
+    const resp = await register(email, password, fullName);
+    return get().changeStatus(resp?.token, resp?.user);
   },
 }));

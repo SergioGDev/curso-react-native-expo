@@ -47,8 +47,25 @@ export const authCheckStatus = async () => {
     return returnUserToken(data);
   } catch (error) {
     console.log(error);
-    throw new Error("Error al verificar el estado de autenticación");
+    return null;
   }
 };
 
-// TODO: Tarea - hacer el register
+export const register = async (
+  email: string,
+  password: string,
+  fullName: string
+) => {
+  try {
+    const { data } = await productsApi.post<AuthResponse>("/auth/register", {
+      email,
+      password,
+      fullName,
+    });
+
+    return returnUserToken(data);
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
